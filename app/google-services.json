@@ -1,21 +1,20 @@
 {
   "project_info": {
-    "project_number": "31572584119",
-    "firebase_url": "https://setgame-711a1-default-rtdb.europe-west1.firebasedatabase.app",
-    "project_id": "setgame-711a1",
-    "storage_bucket": "setgame-711a1.appspot.com"
+    "project_number": "411248426294",
+    "project_id": "setgame2",
+    "storage_bucket": "setgame2.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:31572584119:android:ca9f85477591c80b788f32",
+        "mobilesdk_app_id": "1:411248426294:android:bd34c776430fe3ddc44797",
         "android_client_info": {
           "package_name": "com.example.setgame"
         }
       },
       "oauth_client": [
         {
-          "client_id": "31572584119-gvupe1fderjukdb408d56hrc4i9f4ptb.apps.googleusercontent.com",
+          "client_id": "411248426294-jb2ejlaotpjf2i2qqtq8bpdftspdf4vf.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.setgame",
@@ -23,20 +22,20 @@
           }
         },
         {
-          "client_id": "31572584119-12mvgmue7t7p211hagjaj7no9js5vpqu.apps.googleusercontent.com",
+          "client_id": "411248426294-1210ic8b7qvg5lne5giaj5fl8robvmtc.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCrqQ13U-ayA4bIF49RtpzfUS66Od2X108"
+          "current_key": "AIzaSyDgdMOgAPUj2TqMzEU7MKbov1QoRDgIjjs"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "31572584119-12mvgmue7t7p211hagjaj7no9js5vpqu.apps.googleusercontent.com",
+              "client_id": "411248426294-1210ic8b7qvg5lne5giaj5fl8robvmtc.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

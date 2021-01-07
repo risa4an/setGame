@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.ContentValues.TAG
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.media.MediaCodec
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,68 +16,132 @@ import androidx.annotation.RequiresApi
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import com.google.firebase.database.ktx.database
+import com.google.firebase.database.ktx.getValue
+import com.google.firebase.ktx.Firebase
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.random.Random
+import com.google.firebase.database.DatabaseReference;
 
 
 class GameActivity : Activity(), View.OnClickListener {
-    lateinit var id: Integer
+
+
+    lateinit var game : Game
+    lateinit var gameTemp : Game
+    lateinit var gameId : Integer
+    lateinit var cardsArray : List<Int>
+    var extraRows = 0
+    private lateinit var databaseGame: DatabaseReference
+    private lateinit var scoresLayout: LinearLayout
+    private lateinit var scoresText: TextView
+
     @RequiresApi(Build.VERSION_CODES.R)
-    var game = Game()
-    private lateinit var database: DatabaseReference
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         super.setContentView(R.layout.game_activity)
-        val db = FirebaseDatabase.getInstance()
-        db.getReference().setValue("games")
-        database = db.getReference("games")
+
+        databaseGame = Firebase.database.reference
         val arguments = intent.extras
+
         if (arguments != null){
-            val et = EditText(this)
-            et.tag = "gameId"
-            val button = Button(this)
-            button.text = "Join"
-            button.tag = "join"
-            val ll = LinearLayout(this)
-            ll.addView(et)
-            ll.addView(button)
-            this.findViewById<ConstraintLayout>(R.id.relativeLayout).addView(ll)
+            gameId = arguments["gameId"] as Integer
         }
-        else{
+        else {
             game = Game()
-            var Rand = Random(100)
-            game.id = Integer.parseInt(SimpleDateFormat("yyyyMMddSS").format(Date())) * 100 + Rand.nextInt();
-            id = Integer(game.id!!)
+            game.id =
+                Integer.parseInt(SimpleDateFormat("yyyyMMdd").format(Date())) * 100 + Random.nextInt(0, 100);
+            gameId = Integer(game.id!!)
+
+            //FirebaseAuth.getInstance().currentUser?.let { game.joinGame(it) }
+            //databaseGame = Firebase.database.getReference("games/$gameId")
+           // databaseGame.setValue(game)
+
+            //createField()
+        }
+        databaseGame = databaseGame.child("games").child(gameId.toString())
+        databaseGame.addValueEventListener(listener)
+        if (arguments == null){
             FirebaseAuth.getInstance().currentUser?.let { game.joinGame(it) }
-            database.child(game.id.toString()).setValue(game)
-            val postListener = object : ValueEventListener {
-                override fun onDataChange(dataSnapshot: DataSnapshot) {
-                    game = dataSnapshot.child(game.id.toString()).getValue() as Game
-                    if (game.cards.size > 0) {
-                        changeCards()
-                    }
-                    else {
-                        getScores()
-                    }
-                }
-                override fun onCancelled(databaseError: DatabaseError) {
-                    Log.w(TAG, "loadPost:onCancelled", databaseError.toException())
-                }
-            }
-            database.addValueEventListener(postListener)
+            databaseGame.setValue(game)
             createField()
+        }
+        else {
+            val name = FirebaseAuth.getInstance().currentUser?.displayName
+            if (name != null) {
+                databaseGame.child("scores").child(name).setValue(0)
+            }
         }
 
 
     }
 
+
+
+
+//    fun createListener(){
+//        databaseGame = Firebase.database.getReference("games/$gameId")
+//        if (game.id != null) {
+//            databaseGame.setValue(game)
+//        }
+//        databaseGame.addValueEventListener(listener)
+//
+//        val name = FirebaseAuth.getInstance().currentUser?.displayName
+//        if (name != null) {
+//            databaseGame.child("scores").child(name).setValue(0)
+//        }
+//        databaseGame.child("test").setValue(0)
+//        createField()
+//    }
+
+    private val listener = object : ValueEventListener {
+        override fun onDataChange(dataSnapshot: DataSnapshot) {
+            gameTemp = dataSnapshot.getValue<Game>()!!
+            if(!(::game.isInitialized)){
+                game = gameTemp
+                createField()
+            }
+            else if (gameTemp.previousChosenCards.isNotEmpty() && game.previousChosenCards.isNotEmpty()) {
+                if (gameTemp.previousChosenCards[0] != game.previousChosenCards[0]) {
+                    game = gameTemp
+                    changeCards()
+                }
+            }
+            else if (gameTemp.previousChosenCards.isNotEmpty() && game.previousChosenCards.isEmpty()) {
+
+                    game = gameTemp
+                    changeCards()
+            }
+
+            else if(gameTemp.cards.size == 0){
+                getScores()
+            }
+            if (gameTemp.extraRows != game.extraRows || game.extraRows != extraRows){
+                game = gameTemp
+                addExtraRow()
+            }
+        }
+        override fun onCancelled(databaseError: DatabaseError) {
+            Log.w(TAG, "loadPost:onCancelled", databaseError.toException())
+        }
+    }
+
     fun createField(){
-        val layout = TableLayout(this)
-        layout.layoutParams = TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, TableLayout.LayoutParams.MATCH_PARENT)
-        layout.setPadding(1, 1, 1, 1)
-        var cards: List<ImageButton?>
+        this.setContentView(R.layout.game_activity)
+        findViewById<TextView>(R.id.textView2).setText(gameId.toString())
+        scoresLayout = findViewById<LinearLayout>(R.id.scoresTable)
+        scoresText = TextView(this)
+        var temp = ""
+        for(v in game.scores.keys.toList()){
+            temp = temp + v.toString() + " -> "+ game.scores[v].toString() + "\n"
+        }
+        scoresText.setText(temp)
+        scoresLayout.addView(scoresText)
+        val layout = findViewById<TableLayout>(R.id.tableLayout)
+//        layout.layoutParams = TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, TableLayout.LayoutParams.MATCH_PARENT)
+//        layout.setPadding(3, 3, 3, 3)
+        cardsArray = List(0, {0})
         for (i in 0..3) {
             val tr = TableRow(this)
             tr.setLayoutParams(
@@ -91,8 +154,8 @@ class GameActivity : Activity(), View.OnClickListener {
             val metrics = DisplayMetrics()
             windowManager.defaultDisplay.getMetrics(metrics)
 
-            val width = (metrics.widthPixels - 5) / 3;
-            val height = width / 1.81;
+            val width = (metrics.widthPixels - 30) / 3
+            val height = (width / 1.81).toInt();
 
             for (j in 0..2) {
                 val temp = ImageButton(this)
@@ -101,21 +164,25 @@ class GameActivity : Activity(), View.OnClickListener {
                 bmp = Bitmap.createScaledBitmap(bmp, width, height.toInt(), true);
                 temp.id = cardCode!!;
                 temp.setBackgroundColor(Color.WHITE);
-                //     temp.setLayoutParams(ViewGroup.LayoutParams (2000, 3000))
                 temp.setImageBitmap(bmp)
-                temp.setOnClickListener(this);
-
+                temp.setPadding(2, 2, 2, 2)
+                temp.setOnClickListener(this)
                 tr.addView(temp, j)
             }
             layout.addView(tr, i)
         }
-        this.findViewById<ConstraintLayout>(R.id.relativeLayout).addView(layout)
+        findViewById<Button>(R.id.addCards).setOnClickListener(this)
+        //this.findViewById<ConstraintLayout>(R.id.relativeLayout).addView(layout)
     }
 
     fun changeCards(){
+        var temp = ""
+        for(v in game.scores.keys.toList()){
+            temp = temp + v.toString() + " -> "+ game.scores[v].toString() + "\n"
+        }
+        scoresText.setText(temp)
         val metrics = DisplayMetrics()
         windowManager.defaultDisplay.getMetrics(metrics)
-
         val width = (metrics.widthPixels - 5) / 3;
         val height = width / 1.81;
         for(card in game.previousChosenCards){
@@ -139,26 +206,43 @@ class GameActivity : Activity(), View.OnClickListener {
         findViewById<ConstraintLayout>(R.id.relativeLayout).addView(scoresLayout)
     }
 
+    fun addExtraRow(){
+        extraRows = game.extraRows
+        val layout = findViewById<TableLayout>(R.id.tableLayout)
+        val tr = TableRow(this)
+        tr.setLayoutParams(
+                TableRow.LayoutParams(
+                        TableRow.LayoutParams.FILL_PARENT,
+                        TableRow.LayoutParams.WRAP_CONTENT,
+                        1.0f
+                )
+        )
+        val metrics = DisplayMetrics()
+        windowManager.defaultDisplay.getMetrics(metrics)
+
+        val width = (metrics.widthPixels - 30) / 3
+        val height = (width / 1.81).toInt();
+        for (j in 0..2) {
+            val temp = ImageButton(this)
+            val cardCode = game.popCard()
+            var bmp = MediaStore.Images.Media.getBitmap(this.getContentResolver(), Uri.parse("android.resource://com.example.setgame/drawable/c$cardCode"));
+            bmp = Bitmap.createScaledBitmap(bmp, width, height.toInt(), true);
+            temp.id = cardCode!!;
+            temp.setBackgroundColor(Color.WHITE);
+            temp.setImageBitmap(bmp)
+            temp.setPadding(2, 2, 2, 2)
+            temp.setOnClickListener(this)
+            tr.addView(temp, j)
+        }
+        layout.addView(tr, extraRows + 3)
+    }
+
+
 
     override fun onClick(v: View) {
-        if (v.tag == "gameId"){
-            id = Integer(findViewById<EditText>(v.id).text.toString())
-            val postListener = object : ValueEventListener {
-                override fun onDataChange(dataSnapshot: DataSnapshot) {
-                    game = dataSnapshot.child(id.toString()).value as Game
-                    if (game.cards.size > 0) {
-                        changeCards()
-                    }
-                    else {
-                        getScores()
-                    }
-                }
-                override fun onCancelled(databaseError: DatabaseError) {
-                    Log.w(TAG, "loadPost:onCancelled", databaseError.toException())
-                }
-            }
-            database.addValueEventListener(postListener)
-            createField()
+        if (v.tag == "addCards"){
+            game.extraRows = game.extraRows + 1
+            databaseGame.setValue(game)
             return
         }
         val flag =  game.chooseCard(v.id as Int?);
@@ -168,14 +252,12 @@ class GameActivity : Activity(), View.OnClickListener {
             v.setBackgroundColor(Color.WHITE);
         if (game.chosenCards.size == 3){
             if (FirebaseAuth.getInstance().currentUser?.let { game.checkSet(it) }!!){
-                database.child(game.id.toString()).setValue(game)
+                databaseGame.setValue(game)
                 changeCards()
             }
 
         }
     }
-
-
 }
 
 

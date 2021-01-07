@@ -6,9 +6,11 @@ import java.util.*
 class Game {
     var scores: HashMap<String?, Int>
     var id: Int? = null
+    var extraRows = 0
     var cards: MutableList<Int?>
     var chosenCards: MutableList<Int>
     var previousChosenCards: List<Int>
+    var isChangedBecauseOfJoin: Boolean
     fun popCard(): Int? {
         return if (cards.size > 0) {
             val card = cards[0]
@@ -49,6 +51,7 @@ class Game {
         cards = ArrayList()
         chosenCards = ArrayList()
         previousChosenCards = ArrayList()
+        isChangedBecauseOfJoin = false
         for (x1 in 1..3) {
             for (x2 in 1..3) {
                 for (x3 in 1..3) {
