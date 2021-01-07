@@ -1,41 +1,50 @@
 package com.example.setgame
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues.TAG
-import android.graphics.Bitmap
+import android.content.Context
 import android.graphics.Color
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
-import android.util.DisplayMetrics
 import android.util.Log
 import android.view.View
-import android.widget.*
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.*
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ktx.database
 import com.google.firebase.database.ktx.getValue
 import com.google.firebase.ktx.Firebase
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.random.Random
-import com.google.firebase.database.DatabaseReference;
 
 
-class GameActivity : Activity(), View.OnClickListener {
+class GameActivity : Activity(), RecyclerAdapter.OnCardClickListener {
 
 
-    lateinit var game : Game
-    lateinit var gameTemp : Game
-    lateinit var gameId : Integer
-    lateinit var cardsArray : List<Int>
+    public lateinit var game : Game
     var extraRows = 0
     private lateinit var databaseGame: DatabaseReference
     private lateinit var scoresLayout: LinearLayout
     private lateinit var scoresText: TextView
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var gridLayoutManager: GridLayoutManager
+    private lateinit var adapter : com.example.setgame.RecyclerAdapter
+    private lateinit var cardsOnField : ArrayList<Int>
+
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,7 +53,7 @@ class GameActivity : Activity(), View.OnClickListener {
 
         databaseGame = Firebase.database.reference
         val arguments = intent.extras
-
+        val gameId : Integer
         if (arguments != null){
             gameId = arguments["gameId"] as Integer
         }
@@ -54,11 +63,6 @@ class GameActivity : Activity(), View.OnClickListener {
                 Integer.parseInt(SimpleDateFormat("yyyyMMdd").format(Date())) * 100 + Random.nextInt(0, 100);
             gameId = Integer(game.id!!)
 
-            //FirebaseAuth.getInstance().currentUser?.let { game.joinGame(it) }
-            //databaseGame = Firebase.database.getReference("games/$gameId")
-           // databaseGame.setValue(game)
-
-            //createField()
         }
         databaseGame = databaseGame.child("games").child(gameId.toString())
         databaseGame.addValueEventListener(listener)
@@ -73,31 +77,12 @@ class GameActivity : Activity(), View.OnClickListener {
                 databaseGame.child("scores").child(name).setValue(0)
             }
         }
-
-
     }
 
 
-
-
-//    fun createListener(){
-//        databaseGame = Firebase.database.getReference("games/$gameId")
-//        if (game.id != null) {
-//            databaseGame.setValue(game)
-//        }
-//        databaseGame.addValueEventListener(listener)
-//
-//        val name = FirebaseAuth.getInstance().currentUser?.displayName
-//        if (name != null) {
-//            databaseGame.child("scores").child(name).setValue(0)
-//        }
-//        databaseGame.child("test").setValue(0)
-//        createField()
-//    }
-
     private val listener = object : ValueEventListener {
         override fun onDataChange(dataSnapshot: DataSnapshot) {
-            gameTemp = dataSnapshot.getValue<Game>()!!
+            val gameTemp = dataSnapshot.getValue<Game>()!!
             if(!(::game.isInitialized)){
                 game = gameTemp
                 createField()
@@ -118,7 +103,9 @@ class GameActivity : Activity(), View.OnClickListener {
                 getScores()
             }
             if (gameTemp.extraRows != game.extraRows || game.extraRows != extraRows){
+                val chosenCardsTemp = game.chosenCards
                 game = gameTemp
+                game.chosenCards = chosenCardsTemp
                 addExtraRow()
             }
         }
@@ -127,137 +114,109 @@ class GameActivity : Activity(), View.OnClickListener {
         }
     }
 
+
     fun createField(){
         this.setContentView(R.layout.game_activity)
-        findViewById<TextView>(R.id.textView2).setText(gameId.toString())
+
+        //RecyclerView + GridLayoutManager
+        gridLayoutManager = GridLayoutManager(this, 3)
+        recyclerView = findViewById<RecyclerView>(R.id.recyclerView)
+        recyclerView.layoutManager = gridLayoutManager
+
+        //SCORES
+        val textView = findViewById<TextView>(R.id.textView2)
+        textView.setText(game.id.toString())
+        textView.setOnClickListener(object : View.OnClickListener{
+            override fun onClick(v: View?){
+                val clipboard: ClipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip: ClipData = ClipData.newPlainText("Copied", game.id.toString())
+                clipboard.setPrimaryClip(clip)
+            }
+        })
+
         scoresLayout = findViewById<LinearLayout>(R.id.scoresTable)
         scoresText = TextView(this)
         var temp = ""
-        for(v in game.scores.keys.toList()){
-            temp = temp + v.toString() + " -> "+ game.scores[v].toString() + "\n"
+        for (v in game.scores.values.toList()){
+            for (key in v.keys.toList()){
+                temp = temp + key.toString() + " -> "+ v[key].toString() + "\n"
+            }
         }
         scoresText.setText(temp)
         scoresLayout.addView(scoresText)
-        val layout = findViewById<TableLayout>(R.id.tableLayout)
-//        layout.layoutParams = TableLayout.LayoutParams(TableLayout.LayoutParams.MATCH_PARENT, TableLayout.LayoutParams.MATCH_PARENT)
-//        layout.setPadding(3, 3, 3, 3)
-        cardsArray = List(0, {0})
-        for (i in 0..3) {
-            val tr = TableRow(this)
-            tr.setLayoutParams(
-                    TableRow.LayoutParams(
-                            TableRow.LayoutParams.FILL_PARENT,
-                            TableRow.LayoutParams.WRAP_CONTENT,
-                            1.0f
-                    )
-            )
-            val metrics = DisplayMetrics()
-            windowManager.defaultDisplay.getMetrics(metrics)
+        cardsOnField = ArrayList()
 
-            val width = (metrics.widthPixels - 30) / 3
-            val height = (width / 1.81).toInt();
+        for (i in 0..11)
+            cardsOnField.add(game.popCard()!!)
 
-            for (j in 0..2) {
-                val temp = ImageButton(this)
-                val cardCode = game.popCard()
-                var bmp = MediaStore.Images.Media.getBitmap(this.getContentResolver(), Uri.parse("android.resource://com.example.setgame/drawable/c$cardCode"));
-                bmp = Bitmap.createScaledBitmap(bmp, width, height.toInt(), true);
-                temp.id = cardCode!!;
-                temp.setBackgroundColor(Color.WHITE);
-                temp.setImageBitmap(bmp)
-                temp.setPadding(2, 2, 2, 2)
-                temp.setOnClickListener(this)
-                tr.addView(temp, j)
-            }
-            layout.addView(tr, i)
-        }
-        findViewById<Button>(R.id.addCards).setOnClickListener(this)
-        //this.findViewById<ConstraintLayout>(R.id.relativeLayout).addView(layout)
+        adapter = RecyclerAdapter(cardsOnField, this, this)
+        recyclerView.adapter = adapter
+
+        findViewById<Button>(R.id.addCards).setOnClickListener(object : View.OnClickListener{
+            override fun onClick(v: View?) {
+                game.extraRows = game.extraRows + 1
+                databaseGame.setValue(game)
+            }})
     }
+
 
     fun changeCards(){
+        for (card in game.previousChosenCards){
+            cardsOnField.remove(card)
+            cardsOnField.add(game.popCard()!!)
+        }
         var temp = ""
-        for(v in game.scores.keys.toList()){
-            temp = temp + v.toString() + " -> "+ game.scores[v].toString() + "\n"
+        for (v in game.scores.values.toList()){
+            for (key in v.keys.toList()){
+                temp = temp + key.toString() + " -> "+ v[key].toString() + "\n"
+            }
         }
         scoresText.setText(temp)
-        val metrics = DisplayMetrics()
-        windowManager.defaultDisplay.getMetrics(metrics)
-        val width = (metrics.widthPixels - 5) / 3;
-        val height = width / 1.81;
-        for(card in game.previousChosenCards){
-            val temp = this.findViewById<ImageButton>(card)
-            val newCard = game.popCard();
-            var bmp = MediaStore.Images.Media.getBitmap(this.getContentResolver(), Uri.parse("android.resource://com.example.setgame/drawable/c$newCard"));
-            bmp = Bitmap.createScaledBitmap(bmp, width, height.toInt(), true);
-            temp.setImageBitmap(bmp);
-            temp.setBackgroundColor(Color.WHITE)
-            temp.id = newCard!!
-        }
+        adapter.notifyDataSetChanged()
     }
+
 
     fun getScores(){
         val scoresLayout = findViewById<LinearLayout>(R.id.scoresLayout)
-        for (scores in game.scores){
-            val tv = TextView(this)
-            tv.setText(scores.key + " -> " + scores.value)
-            scoresLayout.addView(tv)
+        val tv = TextView(this)
+        scoresLayout.addView(tv)
+        var temp = ""
+        for (v in game.scores.values.toList()){
+            for (key in v.keys.toList()){
+                temp = temp + key.toString() + " -> "+ v[key].toString() + "\n"
+            }
         }
+        tv.setText(temp)
         findViewById<ConstraintLayout>(R.id.relativeLayout).addView(scoresLayout)
     }
 
+
     fun addExtraRow(){
         extraRows = game.extraRows
-        val layout = findViewById<TableLayout>(R.id.tableLayout)
-        val tr = TableRow(this)
-        tr.setLayoutParams(
-                TableRow.LayoutParams(
-                        TableRow.LayoutParams.FILL_PARENT,
-                        TableRow.LayoutParams.WRAP_CONTENT,
-                        1.0f
-                )
-        )
-        val metrics = DisplayMetrics()
-        windowManager.defaultDisplay.getMetrics(metrics)
-
-        val width = (metrics.widthPixels - 30) / 3
-        val height = (width / 1.81).toInt();
-        for (j in 0..2) {
-            val temp = ImageButton(this)
-            val cardCode = game.popCard()
-            var bmp = MediaStore.Images.Media.getBitmap(this.getContentResolver(), Uri.parse("android.resource://com.example.setgame/drawable/c$cardCode"));
-            bmp = Bitmap.createScaledBitmap(bmp, width, height.toInt(), true);
-            temp.id = cardCode!!;
-            temp.setBackgroundColor(Color.WHITE);
-            temp.setImageBitmap(bmp)
-            temp.setPadding(2, 2, 2, 2)
-            temp.setOnClickListener(this)
-            tr.addView(temp, j)
+        for(i in 0..2){
+            cardsOnField.add(game.popCard()!!)
         }
-        layout.addView(tr, extraRows + 3)
+        adapter.notifyDataSetChanged()
     }
 
 
-
-    override fun onClick(v: View) {
-        if (v.tag == "addCards"){
-            game.extraRows = game.extraRows + 1
-            databaseGame.setValue(game)
-            return
-        }
-        val flag =  game.chooseCard(v.id as Int?);
+    override fun onCardClick(cardId: Int) {
+        val cardLayout = this.findViewById<ConstraintLayout>(cardId)
+        val card = cardLayout.findViewById<ImageView>(R.id.imageView)
+        val flag =  game.chooseCard(cardId);
         if (flag)
-            v.setBackgroundColor(Color.RED);
+            card.setBackgroundColor(Color.RED);
         else
-            v.setBackgroundColor(Color.WHITE);
+            card.setBackgroundColor(Color.WHITE);
         if (game.chosenCards.size == 3){
             if (FirebaseAuth.getInstance().currentUser?.let { game.checkSet(it) }!!){
                 databaseGame.setValue(game)
                 changeCards()
             }
-
         }
     }
 }
+
+
 
 

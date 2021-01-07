@@ -2,15 +2,16 @@ package com.example.setgame
 
 import com.google.firebase.auth.FirebaseUser
 import java.util.*
+import kotlin.collections.HashMap
+import kotlin.properties.Delegates
 
 class Game {
-    var scores: HashMap<String?, Int>
-    var id: Int? = null
+    var scores: HashMap<String?, (HashMap<String?, Int>)>
+    var id by Delegates.notNull<Int>()
     var extraRows = 0
     var cards: MutableList<Int?>
     var chosenCards: MutableList<Int>
     var previousChosenCards: List<Int>
-    var isChangedBecauseOfJoin: Boolean
     fun popCard(): Int? {
         return if (cards.size > 0) {
             val card = cards[0]
@@ -19,15 +20,15 @@ class Game {
         } else null
     }
 
-    val isEnd: Boolean
-        get() = if (cards.isEmpty()) true else false
 
     fun checkSet(user: FirebaseUser): Boolean {
         val result = chosenCards[0] + chosenCards[1] + chosenCards[2]
         return if (result % 3 == 0) {
             previousChosenCards = ArrayList(chosenCards)
             chosenCards.clear()
-            scores[user.displayName] = scores[user.displayName]!! + 1
+            val temp = HashMap<String?, Int>()
+            temp[user.displayName] = scores[user.uid]?.get(user.displayName)!! + 1
+            scores[user.uid] = temp
             true
         } else false
     }
@@ -43,15 +44,17 @@ class Game {
     }
 
     fun joinGame(user: FirebaseUser) {
-        scores[user.displayName] = 0
+        val temp = HashMap<String?, Int>()
+        temp[user.displayName] = 0
+        scores[user.uid] = temp
     }
+
 
     init {
         scores = HashMap()
         cards = ArrayList()
         chosenCards = ArrayList()
         previousChosenCards = ArrayList()
-        isChangedBecauseOfJoin = false
         for (x1 in 1..3) {
             for (x2 in 1..3) {
                 for (x3 in 1..3) {
