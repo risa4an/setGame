@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "411248426294",
+    "project_id": "setgame2",
+    "storage_bucket": "setgame2.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:411248426294:android:bd34c776430fe3ddc44797",
+        "android_client_info": {
+          "package_name": "com.example.setgame"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "411248426294-jb2ejlaotpjf2i2qqtq8bpdftspdf4vf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.setgame",
+            "certificate_hash": "4456bd67573156be9a077d3fbe88a59edc1b8810"
+          }
+        },
+        {
+          "client_id": "411248426294-1210ic8b7qvg5lne5giaj5fl8robvmtc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgdMOgAPUj2TqMzEU7MKbov1QoRDgIjjs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "411248426294-1210ic8b7qvg5lne5giaj5fl8robvmtc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
